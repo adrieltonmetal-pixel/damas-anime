@@ -51,9 +51,12 @@ function renderBoard() {
 
 function handleClick(row, col) {
   if (selected) {
-    move(selected.row, selected.col, row, col);
-    selected = null;
-    renderBoard();
+    if (tryMove(selected.row, selected.col, row, col)) {
+      selected = null;
+      renderBoard();
+    } else {
+      selected = null;
+    }
   } else {
     if (board[row][col] === currentPlayer) {
       selected = { row, col };
@@ -61,35 +64,41 @@ function handleClick(row, col) {
   }
 }
 
-function move(fr, fc, tr, tc) {
-  if (board[tr][tc] !== null) return;
+function tryMove(fr, fc, tr, tc) {
+  if (board[tr][tc] !== null) return false;
 
   let direction = currentPlayer === "A" ? 1 : -1;
 
+  let dr = tr - fr;
+  let dc = tc - fc;
+
   // Movimento simples
-  if (tr === fr + direction && Math.abs(tc - fc) === 1) {
-    board[tr][tc] = board[fr][fc];
-    board[fr][fc] = null;
+  if (dr === direction && Math.abs(dc) === 1) {
+    movePiece(fr, fc, tr, tc);
+    return true;
   }
 
-  // CAPTURA CORRETA
-  else if (tr === fr + direction * 2 && Math.abs(tc - fc) === 2) {
+  // Captura
+  if (dr === direction * 2 && Math.abs(dc) === 2) {
     let midRow = fr + direction;
-    let midCol = fc + (tc > fc ? 1 : -1);
+    let midCol = fc + (dc > 0 ? 1 : -1);
 
     if (
       board[midRow][midCol] !== null &&
       board[midRow][midCol] !== currentPlayer
     ) {
-      board[tr][tc] = board[fr][fc];
-      board[fr][fc] = null;
       board[midRow][midCol] = null;
-    } else {
-      return;
+      movePiece(fr, fc, tr, tc);
+      return true;
     }
-  } else {
-    return;
   }
+
+  return false;
+}
+
+function movePiece(fr, fc, tr, tc) {
+  board[tr][tc] = board[fr][fc];
+  board[fr][fc] = null;
 
   currentPlayer = currentPlayer === "A" ? "B" : "A";
 }
