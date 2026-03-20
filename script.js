@@ -66,21 +66,24 @@ function move(fr, fc, tr, tc) {
 
   let direction = currentPlayer === "A" ? 1 : -1;
 
-  // Movimento normal
+  // Movimento simples
   if (tr === fr + direction && Math.abs(tc - fc) === 1) {
     board[tr][tc] = board[fr][fc];
     board[fr][fc] = null;
   }
 
-  // Captura (pular peça)
+  // CAPTURA CORRETA
   else if (tr === fr + direction * 2 && Math.abs(tc - fc) === 2) {
-    let midRow = (fr + tr) / 2;
-    let midCol = (fc + tc) / 2;
+    let midRow = fr + direction;
+    let midCol = fc + (tc > fc ? 1 : -1);
 
-    if (board[midRow][midCol] && board[midRow][midCol] !== currentPlayer) {
+    if (
+      board[midRow][midCol] !== null &&
+      board[midRow][midCol] !== currentPlayer
+    ) {
       board[tr][tc] = board[fr][fc];
       board[fr][fc] = null;
-      board[midRow][midCol] = null; // remove peça inimiga
+      board[midRow][midCol] = null;
     } else {
       return;
     }
