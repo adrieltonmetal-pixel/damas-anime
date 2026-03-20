@@ -3,69 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Damas Online</title>
+<title>Damas Online PRO</title>
 
 <style>
-body {
-  margin:0;
-  font-family:Arial;
-  background:#0f172a;
-  color:white;
-  text-align:center;
-}
-
-#menu {
-  margin-top:40px;
-}
-
-button {
-  margin:10px;
-  padding:10px 20px;
-  font-size:16px;
-  border:none;
-  border-radius:8px;
-  background:#3b82f6;
-  color:white;
-}
-
-#board {
-  display:grid;
-  grid-template-columns:repeat(8,1fr);
-  max-width:400px;
-  margin:20px auto;
-}
-
-.cell {
-  aspect-ratio:1;
-}
-
+body { background:#0f172a; color:white; text-align:center; font-family:Arial; }
+#board { display:grid; grid-template-columns:repeat(8,1fr); max-width:400px; margin:20px auto; }
+.cell { aspect-ratio:1; }
 .dark { background:#1e293b; }
 .light { background:#cbd5f5; }
 
 .piece {
-  width:80%;
-  height:80%;
+  width:80%; height:80%;
   border-radius:50%;
-  margin:auto;
-  margin-top:10%;
+  margin:auto; margin-top:10%;
 }
-
 .p1 { background:red; }
 .p2 { background:blue; }
-</style>
+.king { border:3px solid gold; }
 
+button { padding:10px; margin:5px; }
+</style>
 </head>
+
 <body>
 
 <div id="menu">
-  <h1>Damas Online</h1>
-  <button onclick="createRoom()">Criar Sala</button>
-  <button onclick="joinRoom()">Entrar na Sala</button>
+<h1>Damas Online</h1>
+<button onclick="createRoom()">Criar Sala</button>
+<button onclick="joinRoom()">Entrar</button>
 </div>
 
 <div id="game" style="display:none;">
-  <h2 id="turnText"></h2>
-  <div id="board"></div>
+<h2 id="turnText"></h2>
+<div id="board"></div>
 </div>
 
 <script type="module">
@@ -86,16 +56,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-let board = [];
-let selected = null;
-let turn = 1;
+let board=[], selected=null, turn=1;
+let roomId=null, player=null;
 
-let roomId = null;
-let player = null;
-
-// TABULEIRO
+// INIT
 function initBoard(){
-  board = [];
+  board=[];
   for(let y=0;y<8;y++){
     board[y]=[];
     for(let x=0;x<8;x++){
@@ -106,43 +72,93 @@ function initBoard(){
   }
 }
 
-// DESENHAR
+// DRAW
 function draw(){
-  let el = document.getElementById("board");
+  let el=document.getElementById("board");
   el.innerHTML="";
 
   document.getElementById("turnText").innerText =
-    player == turn ? "Seu turno" : "Turno do adversário";
+    player==turn?"Seu turno":"Turno adversário";
 
   for(let y=0;y<8;y++){
     for(let x=0;x<8;x++){
-      let cell = document.createElement("div");
-      cell.className = "cell " + ((x+y)%2 ? "dark":"light");
+      let c=document.createElement("div");
+      c.className="cell "+((x+y)%2?"dark":"light");
+      c.onclick=()=>clickCell(x,y);
 
-      cell.onclick = ()=>clickCell(x,y);
-
-      let piece = board[y][x];
-
-      if(piece){
-        let p = document.createElement("div");
-        p.className = "piece " + (piece==1?"p1":"p2");
-        cell.appendChild(p);
+      let p=board[y][x];
+      if(p){
+        let d=document.createElement("div");
+        d.className="piece "+(p>0?"p1":"p2");
+        if(Math.abs(p)==3) d.classList.add("king");
+        c.appendChild(d);
       }
 
-      el.appendChild(cell);
+      el.appendChild(c);
     }
   }
 }
 
+// MOVES
+function getMoves(x,y){
+  let moves=[];
+  let dirs = [[1,1],[-1,1],[1,-1],[-1,-1]];
+  let piece=board[y][x];
+
+  dirs.forEach(([dx,dy])=>{
+    let nx=x+dx, ny=y+dy;
+    if(board[ny]?.[nx]==0) moves.push({x:nx,y:ny});
+  });
+
+  return moves;
+}
+
+// CAPTURA
+function getCaptures(x,y){
+  let caps=[];
+  let dirs=[[1,1],[-1,1],[1,-1],[-1,-1]];
+  let p=board[y][x];
+
+  dirs.forEach(([dx,dy])=>{
+    let nx=x+dx, ny=y+dy;
+    let ex=x+dx*2, ey=y+dy*2;
+
+    if(board[ny]?.[nx] && Math.sign(board[ny][nx])!=Math.sign(p) && board[ey]?.[ex]==0){
+      caps.push({x:ex,y:ey,cx:nx,cy:ny});
+    }
+  });
+
+  return caps;
+}
+
 // CLICK
 function clickCell(x,y){
-  if(player !== turn) return;
+  if(player!==turn) return;
 
   if(selected){
-    move(selected.x,selected.y,x,y);
+    let caps=getCaptures(selected.x,selected.y);
+    let moveOk=false;
+
+    for(let m of caps){
+      if(m.x==x && m.y==y){
+        board[m.cy][m.cx]=0;
+        move(selected.x,selected.y,x,y);
+        moveOk=true;
+      }
+    }
+
+    if(!moveOk){
+      let moves=getMoves(selected.x,selected.y);
+      for(let m of moves){
+        if(m.x==x && m.y==y){
+          move(selected.x,selected.y,x,y);
+        }
+      }
+    }
+
     selected=null;
   } else {
-    if(board[y][x]==player){
+    if(board[y][x] && Math.sign(board[y][x])==(player==1?1:-1)){
       selected={x,y};
     }
   }
@@ -150,53 +166,48 @@ function clickCell(x,y){
   draw();
 }
 
-// MOVIMENTO SIMPLES (base)
+// MOVE
 function move(x1,y1,x2,y2){
-  if(board[y2][x2] !== 0) return;
+  board[y2][x2]=board[y1][x1];
+  board[y1][x1]=0;
 
-  board[y2][x2] = board[y1][x1];
-  board[y1][x1] = 0;
+  // virar dama
+  if(y2==0 && board[y2][x2]==1) board[y2][x2]=3;
+  if(y2==7 && board[y2][x2]==-1) board[y2][x2]=-3;
 
   nextTurn();
 }
 
-// TURNO + SYNC
+// TURN
 function nextTurn(){
   turn = turn==1?2:1;
 
-  if(roomId){
-    set(ref(db, "rooms/" + roomId), {
-      board: board,
-      turn: turn
-    });
-  }
+  set(ref(db,"rooms/"+roomId),{
+    board,turn
+  });
 }
 
-// ESCUTAR
+// LISTEN
 function listenRoom(){
-  onValue(ref(db, "rooms/" + roomId), snapshot=>{
-    let data = snapshot.val();
-    if(data){
-      board = data.board;
-      turn = data.turn;
+  onValue(ref(db,"rooms/"+roomId),snap=>{
+    let d=snap.val();
+    if(d){
+      board=d.board;
+      turn=d.turn;
       draw();
     }
   });
 }
 
-// CRIAR SALA
-window.createRoom = function(){
+// CREATE
+window.createRoom=()=>{
   initBoard();
+  roomId=Math.random().toString(36).substr(2,5);
+  player=1;
 
-  roomId = Math.random().toString(36).substr(2,5);
-  player = 1;
+  set(ref(db,"rooms/"+roomId),{board,turn:1});
 
-  set(ref(db, "rooms/" + roomId), {
-    board: board,
-    turn: 1
-  });
-
-  alert("Código da sala: " + roomId);
+  alert("Sala: "+roomId);
 
   document.getElementById("menu").style.display="none";
   document.getElementById("game").style.display="block";
@@ -204,10 +215,12 @@ window.createRoom = function(){
   listenRoom();
 }
 
-// ENTRAR
-window.joinRoom = function(){
-  roomId = prompt("Digite o código da sala:");
-  player = 2;
+// JOIN
+window.joinRoom=()=>{
+  roomId=prompt("Código:");
+  if(!roomId) return;
+
+  player=2;
 
   document.getElementById("menu").style.display="none";
   document.getElementById("game").style.display="block";
@@ -215,11 +228,9 @@ window.joinRoom = function(){
   listenRoom();
 }
 
-// INICIAR
 initBoard();
 draw();
 
 </script>
-
 </body>
 </html>
