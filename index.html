@@ -1,120 +1,193 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Damas Anime</title>
-  <style>
-    body { font-family: Arial; text-align: center; background: #111; color: #fff; }
-    h1 { margin-top: 10px; }
-    #board { display: grid; grid-template-columns: repeat(8, 1fr); max-width: 400px; margin: auto; }
-    .cell { width: 100%; aspect-ratio: 1; }
-    .dark { background: #444; }
-    .light { background: #ccc; }
-    .piece { width: 80%; height: 80%; border-radius: 50%; margin: auto; margin-top: 10%; }
-    .p1 { background: red; }
-    .p2 { background: blue; }
-    .selected { outline: 3px solid yellow; }
-    button { margin: 10px; padding: 10px; font-size: 16px; }
-  </style>
-</head><link rel="manifest" href="manifest.json">
-<body><script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js');
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Damas Anime</title>
+
+<style>
+body { background:#111; color:#fff; text-align:center; font-family:Arial; }
+#board { display:grid; grid-template-columns:repeat(8,1fr); max-width:400px; margin:auto; }
+.cell { aspect-ratio:1; }
+.dark { background:#444; }
+.light { background:#ccc; }
+.piece {
+  width:80%; height:80%; border-radius:50%;
+  margin:auto; margin-top:10%;
 }
+.p1 { background:red; }
+.p2 { background:blue; }
+.king { border:3px solid gold; }
+.selected { outline:3px solid yellow; }
+button { margin:10px; padding:10px; }
+</style>
+
+</head>
+<body>
+
+<h2 id="turn">Turno: Vermelho</h2>
+<div id="board"></div>
+<button onclick="resetGame()">Reiniciar</button>
+
+<script>
+
+let board = [];
+let selected = null;
+let turn = 1;
+
+function init() {
+  board = Array(8).fill().map(()=>Array(8).fill(0));
+
+  for(let y=0;y<3;y++){
+    for(let x=0;x<8;x++){
+      if((x+y)%2) board[y][x]=2;
+    }
+  }
+
+  for(let y=5;y<8;y++){
+    for(let x=0;x<8;x++){
+      if((x+y)%2) board[y][x]=1;
+    }
+  }
+
+  draw();
+}
+
+function draw(){
+  const b = document.getElementById("board");
+  b.innerHTML="";
+
+  board.forEach((row,y)=>{
+    row.forEach((cell,x)=>{
+      const div=document.createElement("div");
+      div.className="cell "+((x+y)%2?"dark":"light");
+      div.onclick=()=>clickCell(x,y);
+
+      if(cell){
+        const p=document.createElement("div");
+        p.className="piece "+(Math.abs(cell)==1?"p1":"p2");
+
+        if(Math.abs(cell)==3) p.classList.add("king");
+
+        if(selected && selected.x==x && selected.y==y){
+          p.classList.add("selected");
+        }
+
+        div.appendChild(p);
+      }
+
+      b.appendChild(div);
+    });
+  });
+
+  document.getElementById("turn").innerText =
+    "Turno: " + (turn==1?"Vermelho":"Azul");
+}
+
+function clickCell(x,y){
+  if(selected){
+    move(selected.x,selected.y,x,y);
+  }else if(Math.abs(board[y][x])==turn){
+    selected={x,y};
+  }
+  draw();
+}
+
+function hasCapture(player){
+  for(let y=0;y<8;y++){
+    for(let x=0;x<8;x++){
+      if(Math.abs(board[y][x])==player && canCapture(x,y)){
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function canCapture(x,y){
+  const piece = board[y][x];
+  const dirs = [[1,1],[-1,1],[1,-1],[-1,-1]];
+
+  for(let [dx,dy] of dirs){
+    let nx=x+dx, ny=y+dy;
+    let jx=x+dx*2, jy=y+dy*2;
+
+    if(board[ny] && board[jy]){
+      if(board[ny][nx] && Math.abs(board[ny][nx])!=Math.abs(piece) && board[jy][jx]==0){
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function move(x1,y1,x2,y2){
+  const piece = board[y1][x1];
+  const dx=x2-x1;
+  const dy=y2-y1;
+
+  const isKing = Math.abs(piece)==3;
+
+  // movimento simples (só se não tiver captura)
+  if(Math.abs(dx)==1 && !hasCapture(turn)){
+    if(isValidDirection(piece,dy)){
+      board[y2][x2]=piece;
+      board[y1][x1]=0;
+      promote(x2,y2);
+      nextTurn();
+    }
+  }
+
+  // captura
+  if(Math.abs(dx)==2){
+    let mx=(x1+x2)/2;
+    let my=(y1+y2)/2;
+
+    if(board[my][mx] && Math.abs(board[my][mx])!=turn){
+      board[y2][x2]=piece;
+      board[y1][x1]=0;
+      board[my][mx]=0;
+
+      promote(x2,y2);
+
+      // verifica combo
+      if(canCapture(x2,y2)){
+        selected={x:x2,y:y2};
+        return;
+      }
+
+      nextTurn();
+    }
+  }
+
+  selected=null;
+}
+
+function isValidDirection(piece,dy){
+  if(Math.abs(piece)==3) return true;
+  if(piece==1 && dy==-1) return true;
+  if(piece==2 && dy==1) return true;
+  return false;
+}
+
+function promote(x,y){
+  if(board[y][x]==1 && y==0) board[y][x]=3;
+  if(board[y][x]==2 && y==7) board[y][x]=3;
+}
+
+function nextTurn(){
+  turn = turn==1?2:1;
+}
+
+function resetGame(){
+  turn=1;
+  selected=null;
+  init();
+}
+
+init();
+
 </script>
-  <h1>Damas Anime</h1>
-  <p id="turn">Turno: Vermelho</p>
-  <div id="board"></div>
-  <button onclick="resetGame()">Reiniciar</button>
 
-  <script>
-    const boardEl = document.getElementById('board');
-    const turnEl = document.getElementById('turn');
-
-    let board = [];
-    let selected = null;
-    let turn = 1;
-
-    function init() {
-      board = Array(8).fill().map(() => Array(8).fill(0));
-
-      for (let y = 0; y < 3; y++) {
-        for (let x = 0; x < 8; x++) {
-          if ((x + y) % 2 === 1) board[y][x] = 2;
-        }
-      }
-      for (let y = 5; y < 8; y++) {
-        for (let x = 0; x < 8; x++) {
-          if ((x + y) % 2 === 1) board[y][x] = 1;
-        }
-      }
-      draw();
-    }
-
-    function draw() {
-      boardEl.innerHTML = '';
-      board.forEach((row, y) => {
-        row.forEach((cell, x) => {
-          const div = document.createElement('div');
-          div.className = 'cell ' + ((x + y) % 2 ? 'dark' : 'light');
-
-          div.onclick = () => clickCell(x, y);
-
-          if (cell) {
-            const p = document.createElement('div');
-            p.className = 'piece ' + (cell === 1 ? 'p1' : 'p2');
-            if (selected && selected.x === x && selected.y === y) {
-              p.classList.add('selected');
-            }
-            div.appendChild(p);
-          }
-
-          boardEl.appendChild(div);
-        });
-      });
-      turnEl.innerText = 'Turno: ' + (turn === 1 ? 'Vermelho' : 'Azul');
-    }
-
-    function clickCell(x, y) {
-      if (selected) {
-        move(selected.x, selected.y, x, y);
-        selected = null;
-      } else if (board[y][x] === turn) {
-        selected = { x, y };
-      }
-      draw();
-    }
-
-    function move(x1, y1, x2, y2) {
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-
-      if (Math.abs(dx) === 1 && ((turn === 1 && dy === -1) || (turn === 2 && dy === 1))) {
-        board[y2][x2] = board[y1][x1];
-        board[y1][x1] = 0;
-        turn = turn === 1 ? 2 : 1;
-      }
-
-      if (Math.abs(dx) === 2) {
-        const mx = (x1 + x2) / 2;
-        const my = (y1 + y2) / 2;
-        if (board[my][mx] && board[my][mx] !== turn) {
-          board[y2][x2] = board[y1][x1];
-          board[y1][x1] = 0;
-          board[my][mx] = 0;
-          turn = turn === 1 ? 2 : 1;
-        }
-      }
-    }
-
-    function resetGame() {
-      turn = 1;
-      selected = null;
-      init();
-    }
-
-    init();
-  </script>
 </body>
 </html>
