@@ -1,265 +1,147 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Damas Anime PRO FINAL</title>
+<script type="module">
 
-<style>
-body { background:#111; color:#fff; text-align:center; font-family:Arial; }
-#board { display:grid; grid-template-columns:repeat(8,1fr); max-width:400px; margin:auto; }
-.cell { aspect-ratio:1; }
-.dark { background:#444; }
-.light { background:#ccc; }
-.piece { width:80%; height:80%; border-radius:50%; margin:auto; margin-top:10%; }
-.p1 { background:red; }
-.p2 { background:blue; }
-.king { border:3px solid gold; }
-.selected { outline:3px solid yellow; }
-button { margin:10px; padding:10px; }
-</style>
-</head>
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 
-<body>
+// 🔥 SUA CONFIG (já está certa)
+const firebaseConfig = {
+  apiKey: "AIzaSyCsbx1BycA4xyLntIWmJmOc55f9oNi_Lm4",
+  authDomain: "damas-online-1e0db.firebaseapp.com",
+  databaseURL: "https://damas-online-1e0db-default-rtdb.firebaseio.com",
+  projectId: "damas-online-1e0db",
+  storageBucket: "damas-online-1e0db.firebasestorage.app",
+  messagingSenderId: "309855942741",
+  appId: "1:309855942741:web:8033cc2839fc4b6a397cdc"
+};
 
-<h2 id="turn">Turno: Você</h2>
-<div id="board"></div>
-<button onclick="resetGame()">Reiniciar</button>
+// 🔥 INICIAR
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-<script>
+// 🧠 VARIÁVEIS
+let board = [];
+let selected = null;
+let turn = 1;
 
-let board=[], selected=null, turn=1, gameOver=false, aiThinking=false;
+let roomId = null;
+let player = null;
 
-function init(){
-  board = Array(8).fill().map(()=>Array(8).fill(0));
-  for(let y=0;y<3;y++)for(let x=0;x<8;x++)if((x+y)%2)board[y][x]=2;
-  for(let y=5;y<8;y++)for(let x=0;x<8;x++)if((x+y)%2)board[y][x]=1;
-  gameOver=false;
-  draw();
+// 🧩 TABULEIRO
+function initBoard(){
+  board = [];
+  for(let y=0;y<8;y++){
+    board[y]=[];
+    for(let x=0;x<8;x++){
+      if(y<3 && (x+y)%2) board[y][x]=2;
+      else if(y>4 && (x+y)%2) board[y][x]=1;
+      else board[y][x]=0;
+    }
+  }
 }
 
+// 🎨 DESENHAR
 function draw(){
-  const b=document.getElementById("board");
-  b.innerHTML="";
-  board.forEach((row,y)=>{
-    row.forEach((cell,x)=>{
-      const div=document.createElement("div");
-      div.className="cell "+((x+y)%2?"dark":"light");
-      div.onclick=()=>clickCell(x,y);
+  let el = document.getElementById("board");
+  el.innerHTML="";
 
-      if(cell){
-        const p=document.createElement("div");
-        p.className="piece "+(Math.abs(cell)==1?"p1":"p2");
-        if(Math.abs(cell)==3)p.classList.add("king");
-        if(selected && selected.x==x && selected.y==y)p.classList.add("selected");
-        div.appendChild(p);
-      }
+  document.getElementById("turnText").innerText =
+    player == turn ? "Seu turno" : "Turno do adversário";
 
-      b.appendChild(div);
-    });
-  });
-
-  document.getElementById("turn").innerText =
-    gameOver ? "Fim de jogo" : (turn==1?"Sua vez":"IA pensando...");
-}
-
-function clickCell(x,y){
-  if(gameOver || turn!==1 || aiThinking) return;
-
-  if(selected){
-    tryMove(selected.x,selected.y,x,y);
-  } else if(Math.abs(board[y][x])===1){
-    selected={x,y};
-  }
-
-  draw();
-}
-
-function dirs(piece){
-  if(Math.abs(piece)==3) return [[1,1],[-1,1],[1,-1],[-1,-1]];
-  return piece==1 ? [[-1,-1],[1,-1]] : [[-1,1],[1,1]];
-}
-
-function getMoves(x,y){
-  let piece=board[y][x], moves=[];
-  for(let [dx,dy] of dirs(piece)){
-    let nx=x+dx, ny=y+dy;
-    while(board[ny] && board[ny][nx]!==undefined){
-      if(board[ny][nx]==0) moves.push({x:nx,y:ny});
-      else break;
-      if(Math.abs(piece)!=3) break;
-      nx+=dx; ny+=dy;
-    }
-  }
-  return moves;
-}
-
-function getCaptures(x,y){
-  let piece=board[y][x], moves=[];
-  for(let [dx,dy] of dirs(piece)){
-    let nx=x+dx, ny=y+dy, jumped=false;
-    while(board[ny] && board[ny][nx]!==undefined){
-      if(board[ny][nx]==0){
-        if(jumped) moves.push({x:nx,y:ny});
-        if(Math.abs(piece)!=3) break;
-      }
-      else if(Math.abs(board[ny][nx])!=Math.abs(piece)){
-        if(jumped) break;
-        jumped=true;
-      }
-      else break;
-      nx+=dx; ny+=dy;
-    }
-  }
-  return moves;
-}
-
-function allCaptures(player){
-  let all=[];
-  for(let y=0;y<8;y++)for(let x=0;x<8;x++){
-    if(Math.abs(board[y][x])==player){
-      let c=getCaptures(x,y);
-      if(c.length) all.push({x,y,c});
-    }
-  }
-  return all;
-}
-
-function tryMove(x1,y1,x2,y2){
-  let piece=board[y1][x1];
-  let captures=getCaptures(x1,y1);
-  let must=allCaptures(turn);
-
-  let max=0;
-  must.forEach(p=>{ if(p.c.length>max) max=p.c.length });
-
-  if(captures.length && captures.length<max) return;
-
-  let dx=Math.sign(x2-x1), dy=Math.sign(y2-y1);
-
-  // CAPTURA
-  for(let m of captures){
-    if(m.x==x2 && m.y==y2){
-      let cx=x1, cy=y1;
-      while(cx!=x2 || cy!=y2){
-        cx+=dx; cy+=dy;
-        if(board[cy][cx] && Math.abs(board[cy][cx])!=Math.abs(piece)){
-          board[cy][cx]=0;
-          break;
-        }
-      }
-
-      board[y2][x2]=piece;
-      board[y1][x1]=0;
-      promote(x2,y2);
-
-      if(getCaptures(x2,y2).length){
-        selected={x:x2,y:y2};
-        return;
-      }
-
-      nextTurn();
-      return;
-    }
-  }
-
-  // MOVIMENTO NORMAL
-  if(!must.length){
-    let moves=getMoves(x1,y1);
-    for(let m of moves){
-      if(m.x==x2 && m.y==y2){
-        board[y2][x2]=piece;
-        board[y1][x1]=0;
-        promote(x2,y2);
-        nextTurn();
-        return;
-      }
-    }
-  }
-
-  selected=null;
-}
-
-function promote(x,y){
-  if(board[y][x]==1 && y==0) board[y][x]=3;
-  if(board[y][x]==2 && y==7) board[y][x]=3;
-}
-
-function nextTurn(){
-  turn = turn==1?2:1;
-  selected=null;
-  checkWin();
-
-  if(turn==2 && !gameOver){
-    aiThinking=true;
-    setTimeout(()=>{ aiMove(); aiThinking=false; draw(); },500);
-  }
-}
-
-function hasMoves(player){
   for(let y=0;y<8;y++){
     for(let x=0;x<8;x++){
-      if(Math.abs(board[y][x])==player){
-        if(getMoves(x,y).length || getCaptures(x,y).length){
-          return true;
-        }
+      let cell = document.createElement("div");
+      cell.className = "cell " + ((x+y)%2 ? "dark":"light");
+
+      cell.onclick = ()=>clickCell(x,y);
+
+      let piece = board[y][x];
+
+      if(piece){
+        let p = document.createElement("div");
+        p.className = "piece " + (piece==1?"p1":"p2");
+        cell.appendChild(p);
       }
+
+      el.appendChild(cell);
     }
   }
-  return false;
 }
 
-function checkWin(){
-  let p1=0,p2=0;
+// 🖱️ CLICK
+function clickCell(x,y){
+  if(player !== turn) return;
 
-  board.flat().forEach(c=>{
-    if(Math.abs(c)==1)p1++;
-    if(Math.abs(c)==2)p2++;
+  if(selected){
+    move(selected.x,selected.y,x,y);
+    selected=null;
+  } else {
+    if(board[y][x]==player){
+      selected={x,y};
+    }
+  }
+
+  draw();
+}
+
+// 🔁 MOVER
+function move(x1,y1,x2,y2){
+  board[y2][x2] = board[y1][x1];
+  board[y1][x1] = 0;
+
+  nextTurn();
+}
+
+// 🔄 TURNO
+function nextTurn(){
+  turn = turn==1?2:1;
+
+  set(ref(db, "rooms/" + roomId), {
+    board: board,
+    turn: turn
+  });
+}
+
+// 👂 ESCUTAR
+function listenRoom(){
+  onValue(ref(db, "rooms/" + roomId), snapshot=>{
+    let data = snapshot.val();
+    if(data){
+      board = data.board;
+      turn = data.turn;
+      draw();
+    }
+  });
+}
+
+// 👥 CRIAR SALA
+window.createRoom = function(){
+  initBoard();
+
+  roomId = Math.random().toString(36).substr(2,5);
+  player = 1;
+
+  set(ref(db, "rooms/" + roomId), {
+    board: board,
+    turn: 1
   });
 
-  if(p1==0 || !hasMoves(1)){
-    alert("IA venceu!");
-    gameOver=true;
-  }
+  alert("Código da sala: " + roomId);
 
-  if(p2==0 || !hasMoves(2)){
-    alert("Você venceu!");
-    gameOver=true;
-  }
+  document.getElementById("menu").style.display="none";
+  document.getElementById("game").style.display="block";
+
+  listenRoom();
 }
 
-function aiMove(){
-  let all = allCaptures(2);
+// 🔑 ENTRAR
+window.joinRoom = function(){
+  roomId = prompt("Digite o código:");
+  player = 2;
 
-  if(all.length){
-    let best = all.sort((a,b)=>b.c.length-a.c.length)[0];
-    let bestMove = best.c[0];
-    tryMove(best.x, best.y, bestMove.x, bestMove.y);
-    return;
-  }
+  document.getElementById("menu").style.display="none";
+  document.getElementById("game").style.display="block";
 
-  let moves=[];
-  for(let y=0;y<8;y++)for(let x=0;x<8;x++){
-    if(Math.abs(board[y][x])==2){
-      getMoves(x,y).forEach(m=>moves.push({x,y,m}));
-    }
-  }
-
-  if(moves.length){
-    let r=moves[Math.floor(Math.random()*moves.length)];
-    tryMove(r.x,r.y,r.m.x,r.m.y);
-  }
+  listenRoom();
 }
-
-function resetGame(){
-  turn=1;
-  selected=null;
-  init();
-}
-
-init();
 
 </script>
-
-</body>
-</html>
