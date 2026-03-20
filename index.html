@@ -1,11 +1,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "SUA_CHAVE",
   authDomain: "SEU_DOMINIO",
+  databaseURL: "https://SEU-PROJETO-default-rtdb.firebaseio.com",
   projectId: "SEU_ID",
-  databaseURL: "SUA_DATABASE_URL",
   storageBucket: "SEU_BUCKET",
   messagingSenderId: "SEU_ID",
   appId: "SEU_APP_ID"
@@ -14,21 +14,91 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+let salaAtual = null;
+let jogador = null;
+
+// 🧠 TABULEIRO INICIAL (simples)
+function criarTabuleiroInicial() {
+  let board = [];
+  for (let i = 0; i < 8; i++) {
+    board[i] = [];
+    for (let j = 0; j < 8; j++) {
+      board[i][j] = 0;
+    }
+  }
+  return board;
+}
+
+// 🎮 CRIAR SALA
 function criarSala() {
   const codigo = Math.random().toString(36).substring(2, 7);
 
-  console.log("Tentando salvar no Firebase...");
+  salaAtual = codigo;
+  jogador = 1;
 
-  set(ref(db, 'salas/' + codigo), {
-    criadaEm: Date.now()
-  })
-  .then(() => {
-    console.log("SALVO COM SUCESSO");
-    alert("Sala: " + codigo);
-  })
-  .catch((error) => {
-    console.error("ERRO:", error);
+  const board = criarTabuleiroInicial();
+
+  set(ref(db, 'rooms/' + codigo), {
+    board: board,
+    jogadores: {
+      player1: true
+    }
+  });
+
+  alert("Sala: " + codigo);
+
+  escutarSala();
+}
+
+// 🚪 ENTRAR NA SALA
+function entrarSala() {
+  const codigo = prompt("Digite o código da sala:");
+
+  if (!codigo) return;
+
+  salaAtual = codigo;
+  jogador = 2;
+
+  set(ref(db, 'rooms/' + codigo + '/jogadores/player2'), true);
+
+  escutarSala();
+}
+
+// 👂 ESCUTAR ATUALIZAÇÕES
+function escutarSala() {
+  const salaRef = ref(db, 'rooms/' + salaAtual + '/board');
+
+  onValue(salaRef, (snapshot) => {
+    const board = snapshot.val();
+
+    console.log("Tabuleiro atualizado:", board);
+
+    renderizarTabuleiro(board);
   });
 }
 
+// 🎨 RENDER (simples pra teste)
+function renderizarTabuleiro(board) {
+  let texto = "";
+
+  for (let i = 0; i < board.length; i++) {
+    texto += board[i].join(" ") + "\n";
+  }
+
+  console.log(texto);
+}
+
+// 🎯 MOVER PEÇA (TESTE)
+function mover() {
+  const salaRef = ref(db, 'rooms/' + salaAtual + '/board');
+
+  // exemplo: muda um valor aleatório
+  let novoBoard = criarTabuleiroInicial();
+  novoBoard[0][0] = Math.floor(Math.random() * 10);
+
+  set(salaRef, novoBoard);
+}
+
 window.criarSala = criarSala;
+window.entrarSala = entrarSala;
+window.mover = mover;
