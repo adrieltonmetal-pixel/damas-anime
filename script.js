@@ -36,8 +36,14 @@ function renderBoard() {
       } else {
         square.classList.add("dark");
 
-        if (board[row][col] === "A") square.classList.add("pieceA");
-        if (board[row][col] === "B") square.classList.add("pieceB");
+        let piece = board[row][col];
+
+        if (piece === "A") square.classList.add("pieceA");
+        if (piece === "B") square.classList.add("pieceB");
+
+        if (piece === "AK" || piece === "BK") {
+          square.style.border = "3px solid gold";
+        }
       }
 
       square.onclick = () => handleClick(row, col);
@@ -54,11 +60,12 @@ function handleClick(row, col) {
     if (tryMove(selected.row, selected.col, row, col)) {
       selected = null;
       renderBoard();
+      checkWinner();
     } else {
       selected = null;
     }
   } else {
-    if (board[row][col] === currentPlayer) {
+    if (board[row][col] && board[row][col].includes(currentPlayer)) {
       selected = { row, col };
     }
   }
@@ -67,25 +74,34 @@ function handleClick(row, col) {
 function tryMove(fr, fc, tr, tc) {
   if (board[tr][tc] !== null) return false;
 
+  let piece = board[fr][fc];
+  let isKing = piece.includes("K");
+
   let direction = currentPlayer === "A" ? 1 : -1;
 
   let dr = tr - fr;
   let dc = tc - fc;
 
-  // Movimento simples
-  if (dr === direction && Math.abs(dc) === 1) {
+  // Movimento normal
+  if (
+    (dr === direction && Math.abs(dc) === 1) ||
+    (isKing && Math.abs(dr) === 1 && Math.abs(dc) === 1)
+  ) {
     movePiece(fr, fc, tr, tc);
     return true;
   }
 
   // Captura
-  if (dr === direction * 2 && Math.abs(dc) === 2) {
-    let midRow = fr + direction;
-    let midCol = fc + (dc > 0 ? 1 : -1);
+  if (
+    (dr === direction * 2 && Math.abs(dc) === 2) ||
+    (isKing && Math.abs(dr) === 2 && Math.abs(dc) === 2)
+  ) {
+    let midRow = fr + dr / 2;
+    let midCol = fc + dc / 2;
 
     if (
-      board[midRow][midCol] !== null &&
-      board[midRow][midCol] !== currentPlayer
+      board[midRow][midCol] &&
+      !board[midRow][midCol].includes(currentPlayer)
     ) {
       board[midRow][midCol] = null;
       movePiece(fr, fc, tr, tc);
@@ -97,10 +113,36 @@ function tryMove(fr, fc, tr, tc) {
 }
 
 function movePiece(fr, fc, tr, tc) {
-  board[tr][tc] = board[fr][fc];
+  let piece = board[fr][fc];
+
+  board[tr][tc] = piece;
   board[fr][fc] = null;
 
+  // 👑 VIRAR DAMA
+  if (piece === "A" && tr === 7) board[tr][tc] = "AK";
+  if (piece === "B" && tr === 0) board[tr][tc] = "BK";
+
   currentPlayer = currentPlayer === "A" ? "B" : "A";
+}
+
+function checkWinner() {
+  let hasA = false;
+  let hasB = false;
+
+  for (let row of board) {
+    for (let cell of row) {
+      if (cell && cell.includes("A")) hasA = true;
+      if (cell && cell.includes("B")) hasB = true;
+    }
+  }
+
+  if (!hasA) {
+    setTimeout(() => alert("Jogador B venceu!"), 100);
+  }
+
+  if (!hasB) {
+    setTimeout(() => alert("Jogador A venceu!"), 100);
+  }
 }
 
 initBoard();
