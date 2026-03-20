@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Damas Anime PRO</title>
+<title>Damas Anime PRO+</title>
 
 <style>
 body { background:#111; color:#fff; text-align:center; font-family:Arial; }
@@ -27,155 +27,123 @@ body { background:#111; color:#fff; text-align:center; font-family:Arial; }
 
 <script>
 
-let board = [];
-let selected = null;
-let turn = 1;
+let board=[], selected=null, turn=1, gameOver=false;
 
 function init(){
   board = Array(8).fill().map(()=>Array(8).fill(0));
-
-  for(let y=0;y<3;y++){
-    for(let x=0;x<8;x++){
-      if((x+y)%2) board[y][x]=2;
-    }
-  }
-
-  for(let y=5;y<8;y++){
-    for(let x=0;x<8;x++){
-      if((x+y)%2) board[y][x]=1;
-    }
-  }
-
+  for(let y=0;y<3;y++)for(let x=0;x<8;x++)if((x+y)%2)board[y][x]=2;
+  for(let y=5;y<8;y++)for(let x=0;x<8;x++)if((x+y)%2)board[y][x]=1;
+  gameOver=false;
   draw();
 }
 
 function draw(){
   const b=document.getElementById("board");
   b.innerHTML="";
-
   board.forEach((row,y)=>{
     row.forEach((cell,x)=>{
       const div=document.createElement("div");
       div.className="cell "+((x+y)%2?"dark":"light");
       div.onclick=()=>clickCell(x,y);
-
       if(cell){
         const p=document.createElement("div");
         p.className="piece "+(Math.abs(cell)==1?"p1":"p2");
-
-        if(Math.abs(cell)==3) p.classList.add("king");
-
-        if(selected && selected.x==x && selected.y==y){
-          p.classList.add("selected");
-        }
-
+        if(Math.abs(cell)==3)p.classList.add("king");
+        if(selected && selected.x==x && selected.y==y)p.classList.add("selected");
         div.appendChild(p);
       }
-
       b.appendChild(div);
     });
   });
-
   document.getElementById("turn").innerText =
-    "Turno: "+(turn==1?"Vermelho":"Azul");
+    gameOver ? "Fim de jogo" : "Turno: "+(turn==1?"Você":"IA");
 }
 
 function clickCell(x,y){
+  if(gameOver || turn!=1)return;
   if(selected){
-    move(selected.x,selected.y,x,y);
-  } else if(Math.abs(board[y][x])==turn){
+    move(selected.x,selected.y,x,y,true);
+  } else if(Math.abs(board[y][x])==1){
     selected={x,y};
   }
   draw();
 }
 
-function getDirections(piece){
-  if(Math.abs(piece)==3) return [[1,1],[-1,1],[1,-1],[-1,-1]];
-  return piece==1 ? [[-1,-1],[1,-1]] : [[-1,1],[1,1]];
+function dirs(piece){
+  if(Math.abs(piece)==3)return [[1,1],[-1,1],[1,-1],[-1,-1]];
+  return piece==1?[[-1,-1],[1,-1]]:[[-1,1],[1,1]];
 }
 
-function hasCapture(player){
-  for(let y=0;y<8;y++){
-    for(let x=0;x<8;x++){
-      if(Math.abs(board[y][x])==player && getCaptures(x,y).length){
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function getCaptures(x,y){
-  let moves=[];
-  let piece=board[y][x];
-  let dirs=getDirections(piece);
-
-  for(let [dx,dy] of dirs){
+function getMoves(x,y){
+  let piece=board[y][x], moves=[];
+  for(let [dx,dy] of dirs(piece)){
     let nx=x+dx, ny=y+dy;
-    let jumped=false;
-
     while(board[ny] && board[ny][nx]!==undefined){
-      if(board[ny][nx]==0){
-        if(jumped) moves.push({x:nx,y:ny});
-        if(Math.abs(piece)!=3) break;
-      }
-      else if(Math.abs(board[ny][nx])!=Math.abs(piece)){
-        if(jumped) break;
-        jumped=true;
-      }
+      if(board[ny][nx]==0)moves.push({x:nx,y:ny});
       else break;
-
-      nx+=dx;
-      ny+=dy;
+      if(Math.abs(piece)!=3)break;
+      nx+=dx; ny+=dy;
     }
   }
-
   return moves;
 }
 
-function move(x1,y1,x2,y2){
-  let piece=board[y1][x1];
-  let captures=getCaptures(x1,y1);
-  let mustCapture=hasCapture(turn);
-
-  let dx=Math.sign(x2-x1);
-  let dy=Math.sign(y2-y1);
-
-  // Movimento simples
-  if(!mustCapture && board[y2][x2]==0){
-    if(Math.abs(piece)==3){
-      board[y2][x2]=piece;
-      board[y1][x1]=0;
-      promote(x2,y2);
-      nextTurn();
-    } else {
-      if(Math.abs(x2-x1)==1 && Math.abs(y2-y1)==1){
-        board[y2][x2]=piece;
-        board[y1][x1]=0;
-        promote(x2,y2);
-        nextTurn();
+function getCaptures(x,y){
+  let piece=board[y][x], moves=[];
+  for(let [dx,dy] of dirs(piece)){
+    let nx=x+dx, ny=y+dy, jumped=false;
+    while(board[ny] && board[ny][nx]!==undefined){
+      if(board[ny][nx]==0){
+        if(jumped)moves.push({x:nx,y:ny});
+        if(Math.abs(piece)!=3)break;
       }
+      else if(Math.abs(board[ny][nx])!=Math.abs(piece)){
+        if(jumped)break;
+        jumped=true;
+      }
+      else break;
+      nx+=dx; ny+=dy;
     }
   }
+  return moves;
+}
 
-  // Captura
-  for(let move of captures){
-    if(move.x==x2 && move.y==y2){
+function allCaptures(player){
+  let all=[];
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+    if(Math.abs(board[y][x])==player){
+      let c=getCaptures(x,y);
+      if(c.length)all.push({x,y,c});
+    }
+  }
+  return all;
+}
+
+function move(x1,y1,x2,y2,playerMove=false){
+  let piece=board[y1][x1];
+  let captures=getCaptures(x1,y1);
+  let must=allCaptures(turn);
+
+  let max=0;
+  must.forEach(p=>{if(p.c.length>max)max=p.c.length});
+
+  if(captures.length && captures.length<max)return;
+
+  let dx=Math.sign(x2-x1), dy=Math.sign(y2-y1);
+
+  // captura
+  for(let m of captures){
+    if(m.x==x2 && m.y==y2){
       let cx=x1, cy=y1;
-
       while(cx!=x2 || cy!=y2){
-        cx+=dx;
-        cy+=dy;
-
+        cx+=dx; cy+=dy;
         if(board[cy][cx] && Math.abs(board[cy][cx])!=Math.abs(piece)){
           board[cy][cx]=0;
           break;
         }
       }
-
       board[y2][x2]=piece;
       board[y1][x1]=0;
-
       promote(x2,y2);
 
       if(getCaptures(x2,y2).length){
@@ -184,6 +152,20 @@ function move(x1,y1,x2,y2){
       }
 
       nextTurn();
+      return;
+    }
+  }
+
+  // movimento simples
+  if(!must.length){
+    let moves=getMoves(x1,y1);
+    for(let m of moves){
+      if(m.x==x2 && m.y==y2){
+        board[y2][x2]=piece;
+        board[y1][x1]=0;
+        promote(x2,y2);
+        nextTurn();
+      }
     }
   }
 
@@ -191,12 +173,48 @@ function move(x1,y1,x2,y2){
 }
 
 function promote(x,y){
-  if(board[y][x]==1 && y==0) board[y][x]=3;
-  if(board[y][x]==2 && y==7) board[y][x]=3;
+  if(board[y][x]==1 && y==0)board[y][x]=3;
+  if(board[y][x]==2 && y==7)board[y][x]=3;
 }
 
 function nextTurn(){
   turn = turn==1?2:1;
+  selected=null;
+  checkWin();
+
+  if(turn==2 && !gameOver){
+    setTimeout(aiMove,500);
+  }
+}
+
+function checkWin(){
+  let p1=0,p2=0;
+  board.flat().forEach(c=>{
+    if(Math.abs(c)==1)p1++;
+    if(Math.abs(c)==2)p2++;
+  });
+
+  if(p1==0){alert("IA venceu!");gameOver=true;}
+  if(p2==0){alert("Você venceu!");gameOver=true;}
+}
+
+function aiMove(){
+  let moves=[];
+
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+    if(Math.abs(board[y][x])==2){
+      let caps=getCaptures(x,y);
+      let movs=getMoves(x,y);
+      caps.forEach(m=>moves.push({x,y,m}));
+      if(!caps.length)movs.forEach(m=>moves.push({x,y,m}));
+    }
+  }
+
+  if(moves.length){
+    let r=moves[Math.floor(Math.random()*moves.length)];
+    move(r.x,r.y,r.m.x,r.m.y);
+    draw();
+  }
 }
 
 function resetGame(){
