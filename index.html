@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Damas Anime PRO+</title>
+<title>Damas Anime PRO FINAL</title>
 
 <style>
 body { background:#111; color:#fff; text-align:center; font-family:Arial; }
@@ -16,18 +16,19 @@ body { background:#111; color:#fff; text-align:center; font-family:Arial; }
 .p2 { background:blue; }
 .king { border:3px solid gold; }
 .selected { outline:3px solid yellow; }
+button { margin:10px; padding:10px; }
 </style>
 </head>
 
 <body>
 
-<h2 id="turn">Turno: Vermelho</h2>
+<h2 id="turn">Turno: Você</h2>
 <div id="board"></div>
 <button onclick="resetGame()">Reiniciar</button>
 
 <script>
 
-let board=[], selected=null, turn=1, gameOver=false;
+let board=[], selected=null, turn=1, gameOver=false, aiThinking=false;
 
 function init(){
   board = Array(8).fill().map(()=>Array(8).fill(0));
@@ -45,6 +46,7 @@ function draw(){
       const div=document.createElement("div");
       div.className="cell "+((x+y)%2?"dark":"light");
       div.onclick=()=>clickCell(x,y);
+
       if(cell){
         const p=document.createElement("div");
         p.className="piece "+(Math.abs(cell)==1?"p1":"p2");
@@ -52,26 +54,30 @@ function draw(){
         if(selected && selected.x==x && selected.y==y)p.classList.add("selected");
         div.appendChild(p);
       }
+
       b.appendChild(div);
     });
   });
+
   document.getElementById("turn").innerText =
-    gameOver ? "Fim de jogo" : "Turno: "+(turn==1?"Você":"IA");
+    gameOver ? "Fim de jogo" : (turn==1?"Sua vez":"IA pensando...");
 }
 
 function clickCell(x,y){
-  if(gameOver || turn!=1)return;
+  if(gameOver || turn!==1 || aiThinking) return;
+
   if(selected){
-    move(selected.x,selected.y,x,y,true);
-  } else if(Math.abs(board[y][x])==1){
+    tryMove(selected.x,selected.y,x,y);
+  } else if(Math.abs(board[y][x])===1){
     selected={x,y};
   }
+
   draw();
 }
 
 function dirs(piece){
-  if(Math.abs(piece)==3)return [[1,1],[-1,1],[1,-1],[-1,-1]];
-  return piece==1?[[-1,-1],[1,-1]]:[[-1,1],[1,1]];
+  if(Math.abs(piece)==3) return [[1,1],[-1,1],[1,-1],[-1,-1]];
+  return piece==1 ? [[-1,-1],[1,-1]] : [[-1,1],[1,1]];
 }
 
 function getMoves(x,y){
@@ -79,9 +85,9 @@ function getMoves(x,y){
   for(let [dx,dy] of dirs(piece)){
     let nx=x+dx, ny=y+dy;
     while(board[ny] && board[ny][nx]!==undefined){
-      if(board[ny][nx]==0)moves.push({x:nx,y:ny});
+      if(board[ny][nx]==0) moves.push({x:nx,y:ny});
       else break;
-      if(Math.abs(piece)!=3)break;
+      if(Math.abs(piece)!=3) break;
       nx+=dx; ny+=dy;
     }
   }
@@ -94,11 +100,11 @@ function getCaptures(x,y){
     let nx=x+dx, ny=y+dy, jumped=false;
     while(board[ny] && board[ny][nx]!==undefined){
       if(board[ny][nx]==0){
-        if(jumped)moves.push({x:nx,y:ny});
-        if(Math.abs(piece)!=3)break;
+        if(jumped) moves.push({x:nx,y:ny});
+        if(Math.abs(piece)!=3) break;
       }
       else if(Math.abs(board[ny][nx])!=Math.abs(piece)){
-        if(jumped)break;
+        if(jumped) break;
         jumped=true;
       }
       else break;
@@ -113,25 +119,25 @@ function allCaptures(player){
   for(let y=0;y<8;y++)for(let x=0;x<8;x++){
     if(Math.abs(board[y][x])==player){
       let c=getCaptures(x,y);
-      if(c.length)all.push({x,y,c});
+      if(c.length) all.push({x,y,c});
     }
   }
   return all;
 }
 
-function move(x1,y1,x2,y2,playerMove=false){
+function tryMove(x1,y1,x2,y2){
   let piece=board[y1][x1];
   let captures=getCaptures(x1,y1);
   let must=allCaptures(turn);
 
   let max=0;
-  must.forEach(p=>{if(p.c.length>max)max=p.c.length});
+  must.forEach(p=>{ if(p.c.length>max) max=p.c.length });
 
-  if(captures.length && captures.length<max)return;
+  if(captures.length && captures.length<max) return;
 
   let dx=Math.sign(x2-x1), dy=Math.sign(y2-y1);
 
-  // captura
+  // CAPTURA
   for(let m of captures){
     if(m.x==x2 && m.y==y2){
       let cx=x1, cy=y1;
@@ -142,6 +148,7 @@ function move(x1,y1,x2,y2,playerMove=false){
           break;
         }
       }
+
       board[y2][x2]=piece;
       board[y1][x1]=0;
       promote(x2,y2);
@@ -156,7 +163,7 @@ function move(x1,y1,x2,y2,playerMove=false){
     }
   }
 
-  // movimento simples
+  // MOVIMENTO NORMAL
   if(!must.length){
     let moves=getMoves(x1,y1);
     for(let m of moves){
@@ -165,6 +172,7 @@ function move(x1,y1,x2,y2,playerMove=false){
         board[y1][x1]=0;
         promote(x2,y2);
         nextTurn();
+        return;
       }
     }
   }
@@ -173,8 +181,8 @@ function move(x1,y1,x2,y2,playerMove=false){
 }
 
 function promote(x,y){
-  if(board[y][x]==1 && y==0)board[y][x]=3;
-  if(board[y][x]==2 && y==7)board[y][x]=3;
+  if(board[y][x]==1 && y==0) board[y][x]=3;
+  if(board[y][x]==2 && y==7) board[y][x]=3;
 }
 
 function nextTurn(){
@@ -183,37 +191,63 @@ function nextTurn(){
   checkWin();
 
   if(turn==2 && !gameOver){
-    setTimeout(aiMove,500);
+    aiThinking=true;
+    setTimeout(()=>{ aiMove(); aiThinking=false; draw(); },500);
   }
+}
+
+function hasMoves(player){
+  for(let y=0;y<8;y++){
+    for(let x=0;x<8;x++){
+      if(Math.abs(board[y][x])==player){
+        if(getMoves(x,y).length || getCaptures(x,y).length){
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 function checkWin(){
   let p1=0,p2=0;
+
   board.flat().forEach(c=>{
     if(Math.abs(c)==1)p1++;
     if(Math.abs(c)==2)p2++;
   });
 
-  if(p1==0){alert("IA venceu!");gameOver=true;}
-  if(p2==0){alert("Você venceu!");gameOver=true;}
+  if(p1==0 || !hasMoves(1)){
+    alert("IA venceu!");
+    gameOver=true;
+  }
+
+  if(p2==0 || !hasMoves(2)){
+    alert("Você venceu!");
+    gameOver=true;
+  }
 }
 
 function aiMove(){
-  let moves=[];
+  let all = allCaptures(2);
 
+  if(all.length){
+    let best = all.sort((a,b)=>b.c.length-a.c.length)[0];
+    let bestMove = best.c[0];
+    tryMove(best.x, best.y, bestMove.x, bestMove.y);
+    return;
+  }
+
+  let moves=[];
   for(let y=0;y<8;y++)for(let x=0;x<8;x++){
     if(Math.abs(board[y][x])==2){
-      let caps=getCaptures(x,y);
-      let movs=getMoves(x,y);
-      caps.forEach(m=>moves.push({x,y,m}));
-      if(!caps.length)movs.forEach(m=>moves.push({x,y,m}));
+      getMoves(x,y).forEach(m=>moves.push({x,y,m}));
     }
   }
 
   if(moves.length){
     let r=moves[Math.floor(Math.random()*moves.length)];
-    move(r.x,r.y,r.m.x,r.m.y);
-    draw();
+    tryMove(r.x,r.y,r.m.x,r.m.y);
   }
 }
 
