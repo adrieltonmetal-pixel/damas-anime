@@ -17,8 +17,12 @@
     .selected { outline: 3px solid yellow; }
     button { margin: 10px; padding: 10px; font-size: 16px; }
   </style>
-</head>
-<body>
+</head><link rel="manifest" href="manifest.json">
+<body><script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
+</script>
   <h1>Damas Anime</h1>
   <p id="turn">Turno: Vermelho</p>
   <div id="board"></div>
