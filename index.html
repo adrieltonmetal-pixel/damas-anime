@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Damas Anime</title>
+<title>Damas Anime PRO</title>
 
 <style>
 body { background:#111; color:#fff; text-align:center; font-family:Arial; }
@@ -11,18 +11,14 @@ body { background:#111; color:#fff; text-align:center; font-family:Arial; }
 .cell { aspect-ratio:1; }
 .dark { background:#444; }
 .light { background:#ccc; }
-.piece {
-  width:80%; height:80%; border-radius:50%;
-  margin:auto; margin-top:10%;
-}
+.piece { width:80%; height:80%; border-radius:50%; margin:auto; margin-top:10%; }
 .p1 { background:red; }
 .p2 { background:blue; }
 .king { border:3px solid gold; }
 .selected { outline:3px solid yellow; }
-button { margin:10px; padding:10px; }
 </style>
-
 </head>
+
 <body>
 
 <h2 id="turn">Turno: Vermelho</h2>
@@ -35,7 +31,7 @@ let board = [];
 let selected = null;
 let turn = 1;
 
-function init() {
+function init(){
   board = Array(8).fill().map(()=>Array(8).fill(0));
 
   for(let y=0;y<3;y++){
@@ -54,7 +50,7 @@ function init() {
 }
 
 function draw(){
-  const b = document.getElementById("board");
+  const b=document.getElementById("board");
   b.innerHTML="";
 
   board.forEach((row,y)=>{
@@ -81,22 +77,27 @@ function draw(){
   });
 
   document.getElementById("turn").innerText =
-    "Turno: " + (turn==1?"Vermelho":"Azul");
+    "Turno: "+(turn==1?"Vermelho":"Azul");
 }
 
 function clickCell(x,y){
   if(selected){
     move(selected.x,selected.y,x,y);
-  }else if(Math.abs(board[y][x])==turn){
+  } else if(Math.abs(board[y][x])==turn){
     selected={x,y};
   }
   draw();
 }
 
+function getDirections(piece){
+  if(Math.abs(piece)==3) return [[1,1],[-1,1],[1,-1],[-1,-1]];
+  return piece==1 ? [[-1,-1],[1,-1]] : [[-1,1],[1,1]];
+}
+
 function hasCapture(player){
   for(let y=0;y<8;y++){
     for(let x=0;x<8;x++){
-      if(Math.abs(board[y][x])==player && canCapture(x,y)){
+      if(Math.abs(board[y][x])==player && getCaptures(x,y).length){
         return true;
       }
     }
@@ -104,54 +105,80 @@ function hasCapture(player){
   return false;
 }
 
-function canCapture(x,y){
-  const piece = board[y][x];
-  const dirs = [[1,1],[-1,1],[1,-1],[-1,-1]];
+function getCaptures(x,y){
+  let moves=[];
+  let piece=board[y][x];
+  let dirs=getDirections(piece);
 
   for(let [dx,dy] of dirs){
     let nx=x+dx, ny=y+dy;
-    let jx=x+dx*2, jy=y+dy*2;
+    let jumped=false;
 
-    if(board[ny] && board[jy]){
-      if(board[ny][nx] && Math.abs(board[ny][nx])!=Math.abs(piece) && board[jy][jx]==0){
-        return true;
+    while(board[ny] && board[ny][nx]!==undefined){
+      if(board[ny][nx]==0){
+        if(jumped) moves.push({x:nx,y:ny});
+        if(Math.abs(piece)!=3) break;
       }
+      else if(Math.abs(board[ny][nx])!=Math.abs(piece)){
+        if(jumped) break;
+        jumped=true;
+      }
+      else break;
+
+      nx+=dx;
+      ny+=dy;
     }
   }
-  return false;
+
+  return moves;
 }
 
 function move(x1,y1,x2,y2){
-  const piece = board[y1][x1];
-  const dx=x2-x1;
-  const dy=y2-y1;
+  let piece=board[y1][x1];
+  let captures=getCaptures(x1,y1);
+  let mustCapture=hasCapture(turn);
 
-  const isKing = Math.abs(piece)==3;
+  let dx=Math.sign(x2-x1);
+  let dy=Math.sign(y2-y1);
 
-  // movimento simples (só se não tiver captura)
-  if(Math.abs(dx)==1 && !hasCapture(turn)){
-    if(isValidDirection(piece,dy)){
+  // Movimento simples
+  if(!mustCapture && board[y2][x2]==0){
+    if(Math.abs(piece)==3){
       board[y2][x2]=piece;
       board[y1][x1]=0;
       promote(x2,y2);
       nextTurn();
+    } else {
+      if(Math.abs(x2-x1)==1 && Math.abs(y2-y1)==1){
+        board[y2][x2]=piece;
+        board[y1][x1]=0;
+        promote(x2,y2);
+        nextTurn();
+      }
     }
   }
 
-  // captura
-  if(Math.abs(dx)==2){
-    let mx=(x1+x2)/2;
-    let my=(y1+y2)/2;
+  // Captura
+  for(let move of captures){
+    if(move.x==x2 && move.y==y2){
+      let cx=x1, cy=y1;
 
-    if(board[my][mx] && Math.abs(board[my][mx])!=turn){
+      while(cx!=x2 || cy!=y2){
+        cx+=dx;
+        cy+=dy;
+
+        if(board[cy][cx] && Math.abs(board[cy][cx])!=Math.abs(piece)){
+          board[cy][cx]=0;
+          break;
+        }
+      }
+
       board[y2][x2]=piece;
       board[y1][x1]=0;
-      board[my][mx]=0;
 
       promote(x2,y2);
 
-      // verifica combo
-      if(canCapture(x2,y2)){
+      if(getCaptures(x2,y2).length){
         selected={x:x2,y:y2};
         return;
       }
@@ -161,13 +188,6 @@ function move(x1,y1,x2,y2){
   }
 
   selected=null;
-}
-
-function isValidDirection(piece,dy){
-  if(Math.abs(piece)==3) return true;
-  if(piece==1 && dy==-1) return true;
-  if(piece==2 && dy==1) return true;
-  return false;
 }
 
 function promote(x,y){
