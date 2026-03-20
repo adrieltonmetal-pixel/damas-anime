@@ -58,17 +58,30 @@ function handleClick(row, col) {
   }
 }
 
-function move(fr, fc, tr, tc) {
+function movefunction move(fr, fc, tr, tc) {
   if (board[tr][tc] !== null) return;
 
   let direction = currentPlayer === "A" ? 1 : -1;
 
+  // Movimento normal
   if (tr === fr + direction && Math.abs(tc - fc) === 1) {
     board[tr][tc] = board[fr][fc];
     board[fr][fc] = null;
-
-    currentPlayer = currentPlayer === "A" ? "B" : "A";
   }
+
+  // CAPTURA
+  if (tr === fr + direction * 2 && Math.abs(tc - fc) === 2) {
+    let midRow = (fr + tr) / 2;
+    let midCol = (fc + tc) / 2;
+
+    if (board[midRow][midCol] && board[midRow][midCol] !== currentPlayer) {
+      board[tr][tc] = board[fr][fc];
+      board[fr][fc] = null;
+      board[midRow][midCol] = null;
+    }
+  }
+
+  currentPlayer = currentPlayer === "A" ? "B" : "A";
 }
 
 initBoard();
