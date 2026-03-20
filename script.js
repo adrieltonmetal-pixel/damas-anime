@@ -1,4 +1,5 @@
 const boardElement = document.getElementById("board");
+const turnText = document.getElementById("turn");
 
 let board = [];
 let selected = null;
@@ -44,6 +45,8 @@ function renderBoard() {
       boardElement.appendChild(square);
     }
   }
+
+  turnText.innerText = "Turno: Jogador " + currentPlayer;
 }
 
 function handleClick(row, col) {
@@ -58,7 +61,7 @@ function handleClick(row, col) {
   }
 }
 
-function movefunction move(fr, fc, tr, tc) {
+function move(fr, fc, tr, tc) {
   if (board[tr][tc] !== null) return;
 
   let direction = currentPlayer === "A" ? 1 : -1;
@@ -69,16 +72,20 @@ function movefunction move(fr, fc, tr, tc) {
     board[fr][fc] = null;
   }
 
-  // CAPTURA
-  if (tr === fr + direction * 2 && Math.abs(tc - fc) === 2) {
+  // Captura (pular peça)
+  else if (tr === fr + direction * 2 && Math.abs(tc - fc) === 2) {
     let midRow = (fr + tr) / 2;
     let midCol = (fc + tc) / 2;
 
     if (board[midRow][midCol] && board[midRow][midCol] !== currentPlayer) {
       board[tr][tc] = board[fr][fc];
       board[fr][fc] = null;
-      board[midRow][midCol] = null;
+      board[midRow][midCol] = null; // remove peça inimiga
+    } else {
+      return;
     }
+  } else {
+    return;
   }
 
   currentPlayer = currentPlayer === "A" ? "B" : "A";
