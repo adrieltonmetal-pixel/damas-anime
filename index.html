@@ -1,236 +1,34 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Damas Online PRO</title>
-
-<style>
-body { background:#0f172a; color:white; text-align:center; font-family:Arial; }
-#board { display:grid; grid-template-columns:repeat(8,1fr); max-width:400px; margin:20px auto; }
-.cell { aspect-ratio:1; }
-.dark { background:#1e293b; }
-.light { background:#cbd5f5; }
-
-.piece {
-  width:80%; height:80%;
-  border-radius:50%;
-  margin:auto; margin-top:10%;
-}
-.p1 { background:red; }
-.p2 { background:blue; }
-.king { border:3px solid gold; }
-
-button { padding:10px; margin:5px; }
-</style>
-</head>
-
-<body>
-
-<div id="menu">
-<h1>Damas Online</h1>
-<button onclick="createRoom()">Criar Sala</button>
-<button onclick="joinRoom()">Entrar</button>
-</div>
-
-<div id="game" style="display:none;">
-<h2 id="turnText"></h2>
-<div id="board"></div>
-</div>
-
-<script type="module">
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCsbx1BycA4xyLntIWmJmOc55f9oNi_Lm4",
-  authDomain: "damas-online-1e0db.firebaseapp.com",
-  databaseURL: "https://damas-online-1e0db-default-rtdb.firebaseio.com",
-  projectId: "damas-online-1e0db",
-  storageBucket: "damas-online-1e0db.firebasestorage.app",
-  messagingSenderId: "309855942741",
-  appId: "1:309855942741:web:8033cc2839fc4b6a397cdc"
+  apiKey: "SUA_CHAVE",
+  authDomain: "SEU_DOMINIO",
+  projectId: "SEU_ID",
+  databaseURL: "SUA_DATABASE_URL",
+  storageBucket: "SEU_BUCKET",
+  messagingSenderId: "SEU_ID",
+  appId: "SEU_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-let board=[], selected=null, turn=1;
-let roomId=null, player=null;
+function criarSala() {
+  const codigo = Math.random().toString(36).substring(2, 7);
 
-// INIT
-function initBoard(){
-  board=[];
-  for(let y=0;y<8;y++){
-    board[y]=[];
-    for(let x=0;x<8;x++){
-      if(y<3 && (x+y)%2) board[y][x]=2;
-      else if(y>4 && (x+y)%2) board[y][x]=1;
-      else board[y][x]=0;
-    }
-  }
-}
+  console.log("Tentando salvar no Firebase...");
 
-// DRAW
-function draw(){
-  let el=document.getElementById("board");
-  el.innerHTML="";
-
-  document.getElementById("turnText").innerText =
-    player==turn?"Seu turno":"Turno adversário";
-
-  for(let y=0;y<8;y++){
-    for(let x=0;x<8;x++){
-      let c=document.createElement("div");
-      c.className="cell "+((x+y)%2?"dark":"light");
-      c.onclick=()=>clickCell(x,y);
-
-      let p=board[y][x];
-      if(p){
-        let d=document.createElement("div");
-        d.className="piece "+(p>0?"p1":"p2");
-        if(Math.abs(p)==3) d.classList.add("king");
-        c.appendChild(d);
-      }
-
-      el.appendChild(c);
-    }
-  }
-}
-
-// MOVES
-function getMoves(x,y){
-  let moves=[];
-  let dirs = [[1,1],[-1,1],[1,-1],[-1,-1]];
-  let piece=board[y][x];
-
-  dirs.forEach(([dx,dy])=>{
-    let nx=x+dx, ny=y+dy;
-    if(board[ny]?.[nx]==0) moves.push({x:nx,y:ny});
-  });
-
-  return moves;
-}
-
-// CAPTURA
-function getCaptures(x,y){
-  let caps=[];
-  let dirs=[[1,1],[-1,1],[1,-1],[-1,-1]];
-  let p=board[y][x];
-
-  dirs.forEach(([dx,dy])=>{
-    let nx=x+dx, ny=y+dy;
-    let ex=x+dx*2, ey=y+dy*2;
-
-    if(board[ny]?.[nx] && Math.sign(board[ny][nx])!=Math.sign(p) && board[ey]?.[ex]==0){
-      caps.push({x:ex,y:ey,cx:nx,cy:ny});
-    }
-  });
-
-  return caps;
-}
-
-// CLICK
-function clickCell(x,y){
-  if(player!==turn) return;
-
-  if(selected){
-    let caps=getCaptures(selected.x,selected.y);
-    let moveOk=false;
-
-    for(let m of caps){
-      if(m.x==x && m.y==y){
-        board[m.cy][m.cx]=0;
-        move(selected.x,selected.y,x,y);
-        moveOk=true;
-      }
-    }
-
-    if(!moveOk){
-      let moves=getMoves(selected.x,selected.y);
-      for(let m of moves){
-        if(m.x==x && m.y==y){
-          move(selected.x,selected.y,x,y);
-        }
-      }
-    }
-
-    selected=null;
-  } else {
-    if(board[y][x] && Math.sign(board[y][x])==(player==1?1:-1)){
-      selected={x,y};
-    }
-  }
-
-  draw();
-}
-
-// MOVE
-function move(x1,y1,x2,y2){
-  board[y2][x2]=board[y1][x1];
-  board[y1][x1]=0;
-
-  // virar dama
-  if(y2==0 && board[y2][x2]==1) board[y2][x2]=3;
-  if(y2==7 && board[y2][x2]==-1) board[y2][x2]=-3;
-
-  nextTurn();
-}
-
-// TURN
-function nextTurn(){
-  turn = turn==1?2:1;
-
-  set(ref(db,"rooms/"+roomId),{
-    board,turn
+  set(ref(db, 'salas/' + codigo), {
+    criadaEm: Date.now()
+  })
+  .then(() => {
+    console.log("SALVO COM SUCESSO");
+    alert("Sala: " + codigo);
+  })
+  .catch((error) => {
+    console.error("ERRO:", error);
   });
 }
 
-// LISTEN
-function listenRoom(){
-  onValue(ref(db,"rooms/"+roomId),snap=>{
-    let d=snap.val();
-    if(d){
-      board=d.board;
-      turn=d.turn;
-      draw();
-    }
-  });
-}
-
-// CREATE
-window.createRoom=()=>{
-  initBoard();
-  roomId=Math.random().toString(36).substr(2,5);
-  player=1;
-
-  set(ref(db,"rooms/"+roomId),{board,turn:1});
-
-  alert("Sala: "+roomId);
-
-  document.getElementById("menu").style.display="none";
-  document.getElementById("game").style.display="block";
-
-  listenRoom();
-}
-
-// JOIN
-window.joinRoom=()=>{
-  roomId=prompt("Código:");
-  if(!roomId) return;
-
-  player=2;
-
-  document.getElementById("menu").style.display="none";
-  document.getElementById("game").style.display="block";
-
-  listenRoom();
-}
-
-initBoard();
-draw();
-
-</script>
-</body>
-</html>
+window.criarSala = criarSala;
