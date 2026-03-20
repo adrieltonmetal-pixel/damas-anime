@@ -1,9 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Damas Online</title>
+
+<style>
+body {
+  margin:0;
+  font-family:Arial;
+  background:#0f172a;
+  color:white;
+  text-align:center;
+}
+
+#menu {
+  margin-top:40px;
+}
+
+button {
+  margin:10px;
+  padding:10px 20px;
+  font-size:16px;
+  border:none;
+  border-radius:8px;
+  background:#3b82f6;
+  color:white;
+}
+
+#board {
+  display:grid;
+  grid-template-columns:repeat(8,1fr);
+  max-width:400px;
+  margin:20px auto;
+}
+
+.cell {
+  aspect-ratio:1;
+}
+
+.dark { background:#1e293b; }
+.light { background:#cbd5f5; }
+
+.piece {
+  width:80%;
+  height:80%;
+  border-radius:50%;
+  margin:auto;
+  margin-top:10%;
+}
+
+.p1 { background:red; }
+.p2 { background:blue; }
+</style>
+
+</head>
+<body>
+
+<div id="menu">
+  <h1>Damas Online</h1>
+  <button onclick="createRoom()">Criar Sala</button>
+  <button onclick="joinRoom()">Entrar na Sala</button>
+</div>
+
+<div id="game" style="display:none;">
+  <h2 id="turnText"></h2>
+  <div id="board"></div>
+</div>
+
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 
-// 🔥 SUA CONFIG (já está certa)
 const firebaseConfig = {
   apiKey: "AIzaSyCsbx1BycA4xyLntIWmJmOc55f9oNi_Lm4",
   authDomain: "damas-online-1e0db.firebaseapp.com",
@@ -14,11 +83,9 @@ const firebaseConfig = {
   appId: "1:309855942741:web:8033cc2839fc4b6a397cdc"
 };
 
-// 🔥 INICIAR
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// 🧠 VARIÁVEIS
 let board = [];
 let selected = null;
 let turn = 1;
@@ -26,7 +93,7 @@ let turn = 1;
 let roomId = null;
 let player = null;
 
-// 🧩 TABULEIRO
+// TABULEIRO
 function initBoard(){
   board = [];
   for(let y=0;y<8;y++){
@@ -39,7 +106,7 @@ function initBoard(){
   }
 }
 
-// 🎨 DESENHAR
+// DESENHAR
 function draw(){
   let el = document.getElementById("board");
   el.innerHTML="";
@@ -67,7 +134,7 @@ function draw(){
   }
 }
 
-// 🖱️ CLICK
+// CLICK
 function clickCell(x,y){
   if(player !== turn) return;
 
@@ -83,25 +150,29 @@ function clickCell(x,y){
   draw();
 }
 
-// 🔁 MOVER
+// MOVIMENTO SIMPLES (base)
 function move(x1,y1,x2,y2){
+  if(board[y2][x2] !== 0) return;
+
   board[y2][x2] = board[y1][x1];
   board[y1][x1] = 0;
 
   nextTurn();
 }
 
-// 🔄 TURNO
+// TURNO + SYNC
 function nextTurn(){
   turn = turn==1?2:1;
 
-  set(ref(db, "rooms/" + roomId), {
-    board: board,
-    turn: turn
-  });
+  if(roomId){
+    set(ref(db, "rooms/" + roomId), {
+      board: board,
+      turn: turn
+    });
+  }
 }
 
-// 👂 ESCUTAR
+// ESCUTAR
 function listenRoom(){
   onValue(ref(db, "rooms/" + roomId), snapshot=>{
     let data = snapshot.val();
@@ -113,7 +184,7 @@ function listenRoom(){
   });
 }
 
-// 👥 CRIAR SALA
+// CRIAR SALA
 window.createRoom = function(){
   initBoard();
 
@@ -133,9 +204,9 @@ window.createRoom = function(){
   listenRoom();
 }
 
-// 🔑 ENTRAR
+// ENTRAR
 window.joinRoom = function(){
-  roomId = prompt("Digite o código:");
+  roomId = prompt("Digite o código da sala:");
   player = 2;
 
   document.getElementById("menu").style.display="none";
@@ -144,4 +215,11 @@ window.joinRoom = function(){
   listenRoom();
 }
 
+// INICIAR
+initBoard();
+draw();
+
 </script>
+
+</body>
+</html>
